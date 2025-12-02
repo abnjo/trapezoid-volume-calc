@@ -1,0 +1,66 @@
+// Cache version number - update this whenever files change to trigger a cache refresh
+const CACHE_NAME = 'prism-calculator-v1';
+
+// List of files and CDN resources that must be cached for offline use
+const urlsToCache = [
+    '/',
+    '/index.html',
+    '/manifest.json',
+    // CDN assets used in index.html (crucial for offline functionality)
+    'https://cdn.tailwindcss.com',
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
+];
+
+// Install event: Caches all necessary files
+self.addEventListener('install', event => {
+    // Force the waiting service worker to become the active service worker
+    self.skipWaiting(); 
+    
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => {
+                console.log('Opened cache and adding static assets');
+                // Note: fetch will fail for the root path '/' if no index.html is explicitly defined, 
+                // but we include it for best practice.
+                return cache.addAll(urlsToCache);
+            })
+            .catch(error => {
+                console.error('Failed to cache resources:', error);
+            })
+    );
+});
+
+// Activate event: Cleans up old caches
+self.addEventListener('activate', event => {
+    const cacheWhitelist = [CACHE_NAME];
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheWhitelist.indexOf(cacheName) === -1) {
+                        console.log('Deleting old cache:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
+    // Claim control of clients to ensure navigations start working immediately
+    return self.clients.claim();
+});
+
+// Fetch event: Serves content from cache first, falling back to network
+self.addEventListener('fetch', event => {
+    event.respondWith(
+        caches.match(event.request)
+            .then(response => {
+                // Cache hit - return response
+                if (response) {
+                    return response;
+                }
+                
+                // Not in cache - fetch from network
+                return fetch(event.request);
+            })
+    );
+});
